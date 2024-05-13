@@ -29,16 +29,7 @@ $routes->group('admin', function ($routes) {
     });
 
 
-    /**
-     * Users Update
-     */
-    $routes->post('user/manage/(:any)/update', 'UserController::update/$1', [
-        'filter' => 'permission:manage-user',
-        'namespace' => 'julio101290\boilerplate\Controllers\Users',
-        'except' => 'show',
-        'as' => 'update',
-    ]);
-
+ 
 
     /**
      * Permission routes.
@@ -60,15 +51,7 @@ $routes->group('admin', function ($routes) {
     ]);
 
 
-    /**
-     * Role Update
-     */
-    $routes->post('role/(:any)/update', 'RoleController::update/$1', [
-        'filter' => 'permission:role-permission',
-        'namespace' => 'julio101290\boilerplate\Controllers\Users',
-        'except' => 'show',
-        'as' => 'update',
-    ]);
+
 
     /**
      * Menu routes.
@@ -86,4 +69,22 @@ $routes->group('admin', function ($routes) {
         'except'    => 'show',
         'as'        => 'menu-update',
     ]);
+
+        /**
+     * Users Update
+     */
+    $routes->post('user/manage/(:any)/update', 'UserController::update/$1', [
+        'filter' => 'permission:back-office',
+        'namespace' => 'julio101290\boilerplate\Controllers\Users',
+        'except' => 'show',
+        'as' => 'update',
+    ]);
+
+    $routes->post('role/(:any)/update', 'RoleController::update/$1', [
+        'filter' => 'permission:role-permission',
+        'namespace' => 'julio101290\boilerplate\Controllers\Users',
+        'except' => 'show',
+        'as' => 'updateRole',
+    ]);
+    
 });
