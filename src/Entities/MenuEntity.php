@@ -3,7 +3,7 @@
 namespace julio101290\boilerplate\Entities;
 
 use julio101290\boilerplate\Models\MenuModel;
-use CodeIgniter\Entity;
+use CodeIgniter\Entity\Entity;
 
 /**
  * Class MenuEntity.
