@@ -152,26 +152,26 @@ function año($fecha) {
  */
 function fechaHumanizada($fecha) {
     
-    $dias["Monday"] = "Lunes";
-    $dias["Tuesday"] = "Martes";
-    $dias["Wednesday"] = "Miercoles";
-    $dias["Thursday"] = "Jueves";
-    $dias["Friday"] = "Viernes";
-    $dias["Saturday"] = "Sabado";
-    $dias["Sunday"] = "Domingo";
+    $dias["Monday"] = lang('boilerplateDates.Monday');
+    $dias["Tuesday"] = lang('boilerplateDates.Tuesday');
+    $dias["Wednesday"] = lang('boilerplateDates.Wednesday');
+    $dias["Thursday"] = lang('boilerplateDates.Thursday');
+    $dias["Friday"] = lang('boilerplateDates.Friday');
+    $dias["Saturday"] =lang('boilerplateDates.Saturday');
+    $dias["Sunday"] = lang('boilerplateDates.Sunday');
     
-    $meses["January"] = "Enero";
-    $meses["February"] = "Febrero ";
-    $meses["March"] = "Marzo";
-    $meses["April"] = "Abril";
-    $meses["May"] = "Mayo";
-    $meses["June"] = "Junio";
-    $meses["July"] = "Julio";
-    $meses["August"] = "Agosto";
-    $meses["September"] = "Septiembre";
-    $meses["October"] = "Octubre";
-    $meses["November"] = "Noviembre";
-    $meses["December"] = "Diciembre";
+    $meses["January"] = lang('boilerplateDates.January');
+    $meses["February"] =lang('boilerplateDates.February');
+    $meses["March"] = lang('boilerplateDates.March');
+    $meses["April"] = lang('boilerplateDates.April');
+    $meses["May"] = lang('boilerplateDates.May');
+    $meses["June"] = lang('boilerplateDates.June');
+    $meses["July"] = lang('boilerplateDates.July');
+    $meses["August"] = lang('boilerplateDates.August');
+    $meses["September"] = lang('boilerplateDates.September"');
+    $meses["October"] = lang('boilerplateDates.October');
+    $meses["November"] = lang('boilerplateDates.November');
+    $meses["December"] = lang('boilerplateDates.December');
     
     $fechaHumanizada = $dias[date("l", strtotime($fecha))] 
                         .", "
