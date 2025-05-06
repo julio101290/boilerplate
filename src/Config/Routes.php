@@ -87,4 +87,10 @@ $routes->group('admin', function ($routes) {
         'as' => 'updateRole',
     ]);
     
+    
+    $routes->get('generateCRUD/(:any)'
+            , 'AutoCrudController::index/$1'
+            ,['namespace' => 'julio101290\boilerplate\Controllers']
+            );
+    
 });

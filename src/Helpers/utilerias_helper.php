@@ -20,7 +20,11 @@ function esCero($value) {
     }
 }
 
+// CONVIERTE FECHA HTML5 A MYSQLDATETIME 
+function fechaMySQLDateTimeHTML5($fecha) {
 
+    return date("Y-m-d", strtotime($fecha))  ." ". date("H:i:s", strtotime($fecha));
+}
 // CONVIERTE FECHA MYSQLDATETIME A HTML5
 function fechaMySQLADateHTML5($fecha) {
 
