@@ -23,8 +23,8 @@
                         <label for="inputSkills" class="col-sm-2 col-form-label"><?= lang('boilerplate.user.fields.active') ?></label>
                         <div class="col-sm-8">
                             <select class="form-control select" name="active" style="width: 100%;">
-                                <option value="1" selected="selected"><?= lang('boilerplate.user.fields.active') ?></option>
-                                <option value="0"><?= lang('boilerplate.user.fields.non_active') ?></option>
+                                <option <?= $user['active'] == 1 ? 'selected' : '' ?> value="1"><?= lang('boilerplate.user.fields.active') ?></option>
+                                <option <?= $user['active'] == 0 ? 'selected' : '' ?> value="0"><?= lang('boilerplate.user.fields.non_active') ?></option>
                             </select>
                         </div>
                     </div>
@@ -52,7 +52,7 @@
                                 <div class="input-group-prepend">
                                     <span class="input-group-text"><i class="fas fa-user"></i></span>
                                 </div>
-                                <input type="text" name="firstname" class="form-control <?= session('error.firstname') ? 'is-invalid' : '' ?>" value="<?= old('firstname') ?>" placeholder="<?= lang('boilerplate.user.firstname') ?>" autocomplete="off">
+                                <input type="text" name="firstname" class="form-control <?= session('error.firstname') ? 'is-invalid' : '' ?>" value="<?= $user['firstname'] ?>" placeholder="<?= lang('boilerplate.user.firstname') ?>" autocomplete="off">
                                 <?php if (session('error.firstname')) { ?>
                                     <div class="invalid-feedback">
                                         <h6><?= session('error.firstname') ?></h6>
@@ -70,7 +70,7 @@
                                 <div class="input-group-prepend">
                                     <span class="input-group-text"><i class="fas fa-user"></i></span>
                                 </div>
-                                <input type="text" name="lastname" class="form-control <?= session('error.lastname') ? 'is-invalid' : '' ?>" value="<?= old('lastname') ?>" placeholder="<?= lang('boilerplate.user.lastname') ?>" autocomplete="off">
+                                <input type="text" name="lastname" class="form-control <?= session('error.lastname') ? 'is-invalid' : '' ?>" value="<?= $user['lastname'] ?>" placeholder="<?= lang('boilerplate.user.lastname') ?>" autocomplete="off">
                                 <?php if (session('error.lastname')) { ?>
                                     <div class="invalid-feedback">
                                         <h6><?= session('error.lastname') ?></h6>
@@ -134,8 +134,12 @@
                         <label for="inputSkills" class="col-sm-2 col-form-label"><?= lang('boilerplate.permission.title') ?></label>
                         <div class="col-sm-8">
                             <select class="form-control select" name="permission[]" multiple="multiple" data-placeholder="<?= lang('boilerplate.permission.fields.plc_name') ?>" style="width: 100%;">
-                                <?php foreach ($permissions as $permission) { ?>
-                                    <option <?= in_array($permission['id'], old('permission', [])) ? 'selected' : '' ?> value="<?= $permission['id'] ?>"><?= $permission['name'] ?></option>
+                                <?php foreach ($permissions as $value) { ?>
+                                    <?php if (array_key_exists($value['id'], $permission)) { ?>
+                                        <option value="<?= $value['id'] ?>" selected><?= $value['name'] ?></option>
+                                    <?php } else { ?>
+                                        <option value="<?= $value['id'] ?>"><?= $value['name'] ?></option>
+                                    <?php } ?>
                                 <?php } ?>
                             </select>
                             <?php if (session('error.permission')) { ?>
@@ -147,8 +151,12 @@
                         <label for="inputSkills" class="col-sm-2 col-form-label"><?= lang('boilerplate.role.title') ?></label>
                         <div class="col-sm-8">
                             <select class="form-control select" name="role[]" multiple="multiple" data-placeholder="<?= lang('boilerplate.role.fields.plc_name') ?>" style="width: 100%;">
-                                <?php foreach ($roles as $role) { ?>
-                                    <option <?= in_array($role->id, old('role', [])) ? 'selected' : '' ?> value="<?= $role->id ?>"><?= $role->name ?></option>
+                                <?php foreach ($roles as $value) { ?>
+                                    <?php if (array_key_exists($value->id, $role)) { ?>
+                                        <option value="<?= $value->id ?>" selected><?= $value->name ?></option>
+                                    <?php } else { ?>
+                                        <option value="<?= $value->id ?>"><?= $value->name ?></option>
+                                    <?php } ?>
                                 <?php } ?>
                             </select>
                             <?php if (session('error.role')) { ?>

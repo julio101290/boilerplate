@@ -13,15 +13,14 @@ use Myth\Auth\Entities\User;
 /**
  * Class UserController.
  */
-class UserController extends BaseController
-{
+class UserController extends BaseController {
+
     use ResponseTrait;
 
     /** @var \julio101290\boilerplate\Models\UserModel */
     protected $users;
 
-    public function __construct()
-    {
+    public function __construct() {
         $this->users = new UserModel();
     }
 
@@ -30,8 +29,7 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function index()
-    {
+    public function index() {
         if ($this->request->isAJAX()) {
             $start = $this->request->getGet('start');
             $length = $this->request->getGet('length');
@@ -40,14 +38,14 @@ class UserController extends BaseController
             $dir = $this->request->getGet('order[0][dir]');
 
             return $this->respond(Collection::datatable(
-                $this->users->getResource($search)->orderBy($order, $dir)->limit($length, $start)->get()->getResultObject(),
-                $this->users->getResource()->countAllResults(),
-                $this->users->getResource($search)->countAllResults()
-            ));
+                                    $this->users->getResource($search)->orderBy($order, $dir)->limit($length, $start)->get()->getResultObject(),
+                                    $this->users->getResource()->countAllResults(),
+                                    $this->users->getResource($search)->countAllResults()
+                            ));
         }
 
         return view('julio101290\boilerplate\Views\User\index', [
-            'title'    => lang('boilerplate.user.title'),
+            'title' => lang('boilerplate.user.title'),
             'subtitle' => lang('boilerplate.user.subtitle'),
         ]);
     }
@@ -57,14 +55,13 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function profile()
-    {
+    public function profile() {
         if ($this->request->getMethod() === 'post') {
             $id = user()->id;
             $validationRules = [
-                'email'        => "required|valid_email|is_unique[users.email,id,$id]",
-                'username'     => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$id]",
-                'password'     => 'if_exist',
+                'email' => "required|valid_email|is_unique[users.email,id,$id]",
+                'username' => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$id]",
+                'password' => 'if_exist',
                 'pass_confirm' => 'matches[password]',
             ];
 
@@ -98,14 +95,25 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function new()
-    {
-        return view('julio101290\boilerplate\Views\User\create', [
-            'title'       => lang('boilerplate.user.title'),
-            'subtitle'    => lang('boilerplate.user.add'),
+    public function new() {
+
+        $data = [
+            'title' => lang('boilerplate.user.title'),
+            'subtitle' => lang('boilerplate.user.add'),
             'permissions' => $this->authorize->permissions(),
-            'roles'       => $this->authorize->groups(),
-        ]);
+            'permission' => (new PermissionModel())->getPermissionsForUser(-1) ?? [],
+            'roles' => $this->authorize->groups(),
+            'role' => (new GroupModel())->getGroupsForUser(-1) ?? [],
+            'user' => $this->users->asArray()->find(-1) ?? [
+        'firstname' => '',
+        'lastname' => '',
+        'active' => 1,
+        'email' => '',
+        'username' => '',
+            ],
+        ];
+
+        return view('julio101290\boilerplate\Views\User\create', $data);
     }
 
     /**
@@ -113,16 +121,15 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function create()
-    {
+    public function create() {
         $validationRules = [
-            'active'       => 'required',
-            'username'     => 'required|alpha_numeric_space|min_length[3]|is_unique[users.username]',
-            'email'        => 'required|valid_email|is_unique[users.email]',
-            'password'     => 'required|strong_password',
+            'active' => 'required',
+            'username' => 'required|alpha_numeric_space|min_length[3]|is_unique[users.username]',
+            'email' => 'required|valid_email|is_unique[users.email]',
+            'password' => 'required|strong_password',
             'pass_confirm' => 'required|matches[password]',
-            'permission'   => 'required',
-            'role'         => 'required',
+            'permission' => 'required',
+            'role' => 'required',
         ];
 
         $permissions = $this->request->getPost('permission');
@@ -136,12 +143,12 @@ class UserController extends BaseController
 
         try {
             $id = $this->users->insert(new User([
-                'active'   => $this->request->getPost('active'),
-                'email'    => $this->request->getPost('email'),
-                'firstname'    => $this->request->getPost('firstname'),
-                'lastname'    => $this->request->getPost('lastname'),
-                'username' => $this->request->getPost('username'),
-                'password' => $this->request->getPost('password'),
+                        'active' => $this->request->getPost('active'),
+                        'email' => $this->request->getPost('email'),
+                        'firstname' => $this->request->getPost('firstname'),
+                        'lastname' => $this->request->getPost('lastname'),
+                        'username' => $this->request->getPost('username'),
+                        'password' => $this->request->getPost('password'),
             ]));
 
             foreach ($permissions as $permission) {
@@ -159,7 +166,7 @@ class UserController extends BaseController
             return redirect()->back()->with('sweet-error', $e->getMessage());
         }
 
-        return redirect()->back()->with('sweet-success', lang('boileplate.user.msg.msg_insert'));
+        return redirect()->back()->with('sweet-success', lang('boilerplate.user.msg.msg_insert'));
     }
 
     /**
@@ -169,19 +176,39 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function edit($id)
-    {
+    public function edit($id) {
         $data = [
-            'title'       => lang('boilerplate.user.title'),
-            'subtitle'    => lang('boilerplate.user.edit'),
+            'title' => lang('boilerplate.user.title'),
+            'subtitle' => lang('boilerplate.user.edit'),
             'permissions' => $this->authorize->permissions(),
-            'permission'  => (new PermissionModel())->getPermissionsForUser($id),
-            'roles'       => $this->authorize->groups(),
-            'role'        => (new GroupModel())->getGroupsForUser($id),
-            'user'        => $this->users->asArray()->find($id),
+            'permission' => (new PermissionModel())->getPermissionsForUser($id),
+            'roles' => $this->authorize->groups(),
+            'role' => (new GroupModel())->getGroupsForUser($id),
+            'user' => $this->users->asArray()->find($id),
         ];
 
         return view('julio101290\boilerplate\Views\User\update', $data);
+    }
+
+    /**
+     * Return the editable properties of a resource object.
+     *
+     * @param int id
+     *
+     * @return mixed
+     */
+    public function clone($id) {
+        $data = [
+            'title' => lang('boilerplate.user.title'),
+            'subtitle' => lang('boilerplate.user.add'),
+            'permissions' => $this->authorize->permissions(),
+            'permission' => (new PermissionModel())->getPermissionsForUser($id),
+            'roles' => $this->authorize->groups(),
+            'role' => (new GroupModel())->getGroupsForUser($id),
+            'user' => $this->users->asArray()->find($id),
+        ];
+
+        return view('julio101290\boilerplate\Views\User\create', $data);
     }
 
     /**
@@ -191,16 +218,15 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function update($id)
-    {
+    public function update($id) {
         $validationRules = [
-            'active'       => 'required',
-            'username'     => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$id]",
-            'email'        => "required|valid_email|is_unique[users.email,id,$id]",
-            'password'     => 'if_exist',
+            'active' => 'required',
+            'username' => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$id]",
+            'email' => "required|valid_email|is_unique[users.email,id,$id]",
+            'password' => 'if_exist',
             'pass_confirm' => 'matches[password]',
-            'permission'   => 'if_exist',
-            'role'         => 'if_exist',
+            'permission' => 'if_exist',
+            'role' => 'if_exist',
         ];
 
         if (!$this->validate($validationRules)) {
@@ -257,8 +283,7 @@ class UserController extends BaseController
      *
      * @return mixed
      */
-    public function delete($id)
-    {
+    public function delete($id) {
         if (!$found = $this->users->delete($id)) {
             return $this->failNotFound(lang('boilerplate.user.msg.msg_get_fail'));
         }
