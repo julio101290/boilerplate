@@ -42,19 +42,16 @@ class AutoCrudController extends BaseController {
 
 
 
-        /*
-          $this->generateModel($table);
-          $this->generateController($table);
-          $this->generateView($table);
-          $this->generateViewModal($table);
-          $this->generateLanguage($table);
 
-          $this->generateMigration($table);
-          // $this->generateLanguageES($table);
-          $this->generatePermissions($table);
+        $this->generateModel($table);
+        $this->generateController($table);
+        $this->generateView($table);
+        $this->generateViewModal($table);
+        $this->generateLanguage($table);
 
-
-         */
+        //$this->generateMigration($table);
+        // $this->generateLanguageES($table);
+        $this->generatePermissions($table);
 
         $tableUpCase = ucfirst($table);
 
@@ -74,69 +71,80 @@ class AutoCrudController extends BaseController {
     /**
      * Generate Model
      */
-    public function generateModel($table) {
+    public function generateModel(string $table): void {
+        $forge = $this->db;
 
-        $tableUpCase = ucfirst($table);
-        $query = $this->db->getFieldNames($table);
-
-        $fields = "";
-
-        foreach ($query as $field) {
-            $fields .= "'" . $field . "'" . ",";
+        // Verificar si la tabla existe
+        if (!$forge->tableExists($table)) {
+            echo "❌ La tabla '$table' no existe.";
+            return;
         }
 
+        // Obtener campos de la tabla
+        $fieldsArray = $forge->getFieldNames($table);
 
-        $fields = substr($fields, 0, strlen($fields) - 1);
-
-        $fields2 = "";
-
-        foreach ($query as $field2) {
-            $fields2 .= "a." . $field2 . ",";
+        if (empty($fieldsArray)) {
+            echo "❌ No se pudieron obtener los campos de la tabla '$table'.";
+            return;
         }
 
+        // Preparar campos para allowedFields
+        $allowedFields = array_map(fn($f) => "'$f'", $fieldsArray);
+        $allowedFieldsStr = implode(', ', $allowedFields);
 
-        $fields2 = substr($fields2, 0, strlen($fields2) - 1);
+        // Preparar campos para el SELECT con alias a.
+        $prefixedFields = array_map(fn($f) => "a.$f", $fieldsArray);
+        $selectFieldsStr = implode(', ', $prefixedFields);
 
         $nombreClase = ucfirst($table) . "Model";
-
         $nombreTabla = ucfirst($table);
 
-        $model = <<<EOF
-        <?php
-        namespace App\Models;
-        use CodeIgniter\Model;
-        class $nombreClase extends Model{
-            protected \$table      = '$table';
-            protected \$primaryKey = 'id';
-            protected \$useAutoIncrement = true;
-            protected \$returnType     = 'array';
-            protected \$useSoftDeletes = true;
-            protected \$allowedFields = [$fields];
-            protected \$useTimestamps = true;
-            protected \$createdField  = 'created_at';
-            protected \$deletedField  = 'deleted_at';
-            protected \$validationRules    =  [
-            ];
-            protected \$validationMessages = [];
-            protected \$skipValidation     = false;
-        
-        
-        
-            public function mdlGet$nombreTabla(\$idEmpresas){
+        // Generar código del modelo
+        $model = <<<PHP
+<?php
+namespace App\Models;
 
-                \$result = \$this->db->table('$table a, empresas b')
-                         ->select('$fields2 ,b.nombre as nombreEmpresa')
-                         ->where('a.idEmpresa', 'b.id', FALSE)
-                         ->whereIn('a.idEmpresa',\$idEmpresas);
-         
-                 return \$result;
-             }
-        
+use CodeIgniter\Model;
+
+class $nombreClase extends Model
+{
+    protected \$table            = '$table';
+    protected \$primaryKey       = 'id';
+    protected \$useAutoIncrement = true;
+    protected \$returnType       = 'array';
+    protected \$useSoftDeletes   = true;
+    protected \$allowedFields    = [$allowedFieldsStr];
+    protected \$useTimestamps    = true;
+    protected \$createdField     = 'created_at';
+    protected \$updatedField     = 'updated_at';
+    protected \$deletedField     = 'deleted_at';
+
+    protected \$validationRules    = [];
+    protected \$validationMessages = [];
+    protected \$skipValidation     = false;
+
+    public function mdlGet$nombreTabla(array \$idEmpresas)
+    {
+        return \$this->db->table('$table a')
+            ->join('empresas b', 'a.idEmpresa = b.id')
+            ->select("$selectFieldsStr, b.nombre AS nombreEmpresa")
+            ->whereIn('a.idEmpresa', \$idEmpresas);
+    }
+}
+PHP;
+
+        // Ruta de guardado
+        $filePath = ROOTPATH . "app/Models/$nombreClase.php";
+
+        // Crear directorio si no existe
+        if (!is_dir(dirname($filePath))) {
+            mkdir(dirname($filePath), 0777, true);
         }
-                
-        EOF;
 
-        file_put_contents(ROOTPATH . "app/Models/$nombreClase.php", $model);
+        // Guardar archivo
+        file_put_contents($filePath, $model);
+
+        echo "✅ Modelo generado exitosamente: <code>app/Models/$nombreClase.php</code>";
     }
 
     /**
@@ -147,170 +155,185 @@ class AutoCrudController extends BaseController {
     /**
      * Generate Controller
      */
-    public function generateController($table) {
+    public function generateController(string $table): void {
+        $fieldsArray = $this->db->getFieldNames($table);
 
-        $query = $this->db->getFieldNames($table);
-
-        $fields = "";
-
-        foreach ($query as $field) {
-            $fields .= $field . ",";
+        if (empty($fieldsArray)) {
+            echo "❌ No se pudieron obtener los campos de la tabla '$table'.";
+            return;
         }
 
-
-        $fields = substr($fields, 0, strlen($fields) - 1);
-
         $nameClassModel = ucfirst($table) . "Model";
-
         $tableUpCase = ucfirst($table);
+        $varName = lcfirst($table);
 
-        $controller = <<<EOF
-        <?php
-         namespace App\Controllers;
-         use App\Controllers\BaseController;
-         use \App\Models\{$nameClassModel};
-         use julio101290\boilerplatelog\Models\LogModel;
-         use CodeIgniter\API\ResponseTrait;
-         use julio101290\boilerplatecompanies\Models\EmpresasModel;
+        $controller = <<<PHP
+<?php
 
-         class {$tableUpCase}Controller extends BaseController {
-             use ResponseTrait;
-             protected \$log;
-             protected $$table;
-             public function __construct() {
-                 \$this->$table = new $nameClassModel();
-                 \$this->log = new LogModel();
-                 \$this->empresa = new EmpresasModel();
-                 helper('menu');
-                 helper('utilerias');
-             }
-             public function index() {
+namespace App\Controllers;
 
+use App\Controllers\BaseController;
+use App\Models\{$nameClassModel};
+use CodeIgniter\API\ResponseTrait;
+use julio101290\boilerplatelog\Models\LogModel;
+use julio101290\boilerplatecompanies\Models\EmpresasModel;
 
+class {$tableUpCase}Controller extends BaseController
+{
+    use ResponseTrait;
 
-                helper('auth');
+    protected \$log;
+    protected \${$varName};
+    protected \$empresa;
 
-                \$idUser = user()->id;
-                \$titulos["empresas"] = \$this->empresa->mdlEmpresasPorUsuario(\$idUser);
-        
-                if (count(\$titulos["empresas"]) == "0") {
-        
-                    \$empresasID[0] = "0";
-                } else {
-        
-                    \$empresasID = array_column(\$titulos["empresas"], "id");
+    public function __construct()
+    {
+        \$this->{$varName} = new $nameClassModel();
+        \$this->log = new LogModel();
+        \$this->empresa = new EmpresasModel();
+        helper(['menu', 'utilerias']);
+    }
+
+    public function index()
+    {
+        helper('auth');
+
+        \$idUser = user()->id;
+        \$titulos["empresas"] = \$this->empresa->mdlEmpresasPorUsuario(\$idUser);
+        \$empresasID = count(\$titulos["empresas"]) === 0 ? [0] : array_column(\$titulos["empresas"], "id");
+
+        if (\$this->request->isAJAX()) {
+            \$request = service('request');
+
+            \$draw = (int) \$request->getGet('draw');
+            \$start = (int) \$request->getGet('start');
+            \$length = (int) \$request->getGet('length');
+            \$searchValue = \$request->getGet('search')['value'] ?? '';
+            \$orderColumnIndex = (int) \$request->getGet('order')[0]['column'] ?? 0;
+            \$orderDir = \$request->getGet('order')[0]['dir'] ?? 'asc';
+
+            \$fields = \$this->{$varName}->allowedFields;
+            \$orderField = \$fields[\$orderColumnIndex] ?? 'id';
+
+            \$builder = \$this->{$varName}->builder()->whereIn('idEmpresa', \$empresasID);
+
+            \$total = clone \$builder;
+            \$recordsTotal = \$total->countAllResults(false);
+
+            if (!empty(\$searchValue)) {
+                \$builder->groupStart();
+                foreach (\$fields as \$field) {
+                    \$builder->orLike(\$field, \$searchValue);
                 }
-        
-    
+                \$builder->groupEnd();
+            }
 
+            \$filteredBuilder = clone \$builder;
+            \$recordsFiltered = \$filteredBuilder->countAllResults(false);
 
-                 if (\$this->request->isAJAX()) {
-                    \$datos = \$this->{$table}->mdlGet$tableUpCase(\$empresasID);
-                     
-                 
-                     return \Hermawan\DataTables\DataTable::of(\$datos)->toJson(true);
-                 }
-                 \$titulos["title"] = lang('$table.title');
-                 \$titulos["subtitle"] = lang('$table.subtitle');
-                 return view('$table', \$titulos);
-             }
-             /**
-              * Read $tableUpCase
-              */
-             public function get$tableUpCase() {
-                
-                helper('auth');
+            \$data = \$builder->orderBy(\$orderField, \$orderDir)
+                             ->get(\$length, \$start)
+                             ->getResultArray();
 
-                \$idUser = user()->id;
-                \$titulos["empresas"] = \$this->empresa->mdlEmpresasPorUsuario(\$idUser);
+            return \$this->response->setJSON([
+                'draw' => \$draw,
+                'recordsTotal' => \$recordsTotal,
+                'recordsFiltered' => \$recordsFiltered,
+                'data' => \$data,
+            ]);
+        }
 
-                if (count(\$titulos["empresas"]) == "0") {
+        \$titulos["title"] = lang('$table.title');
+        \$titulos["subtitle"] = lang('$table.subtitle');
+        return view('$table', \$titulos);
+    }
 
-                    \$empresasID[0] = "0";
-                } else {
+    public function get{$tableUpCase}()
+    {
+        helper('auth');
 
-                    \$empresasID = array_column(\$titulos["empresas"], "id");
+        \$idUser = user()->id;
+        \$titulos["empresas"] = \$this->empresa->mdlEmpresasPorUsuario(\$idUser);
+        \$empresasID = count(\$titulos["empresas"]) === 0 ? [0] : array_column(\$titulos["empresas"], "id");
+
+        \$id$tableUpCase = \$this->request->getPost("id$tableUpCase");
+        \$dato = \$this->{$varName}->whereIn('idEmpresa', \$empresasID)
+                                   ->where('id', \$id$tableUpCase)
+                                   ->first();
+
+        return \$this->response->setJSON(\$dato);
+    }
+
+    public function save()
+    {
+        helper('auth');
+
+        \$userName = user()->username;
+        \$datos = \$this->request->getPost();
+        \$idKey = \$datos["id$tableUpCase"] ?? 0;
+
+        if (\$idKey == 0) {
+            try {
+                if (!\$this->{$varName}->save(\$datos)) {
+                    \$errores = implode(" ", \$this->{$varName}->errors());
+                    return \$this->respond(['status' => 400, 'message' => \$errores], 400);
                 }
-                
-                
-                \$id$tableUpCase = \$this->request->getPost("id$tableUpCase");
-                 \$datos$tableUpCase = \$this->{$table}->whereIn('idEmpresa',\$empresasID)
-                 ->where("id",\$id$tableUpCase)->first();
-                 echo json_encode(\$datos$tableUpCase);
-             
-             
-                }
-             /**
-              * Save or update $tableUpCase
-              */
-             public function save() {
-                 helper('auth');
-                 \$userName = user()->username;
-                 \$idUser = user()->id;
-                 \$datos = \$this->request->getPost();
-                 if (\$datos["id$tableUpCase"] == 0) {
-                     try {
-                         if (\$this->{$table}->save(\$datos) === false) {
-                             \$errores = \$this->{$table}->errors();
-                             foreach (\$errores as \$field => \$error) {
-                                 echo \$error . " ";
-                             }
-                             return;
-                         }
-                         \$dateLog["description"] = lang("vehicles.logDescription") . json_encode(\$datos);
-                         \$dateLog["user"] = \$userName;
-                         \$this->log->save(\$dateLog);
-                         echo "Guardado Correctamente";
-                     } catch (\PHPUnit\Framework\Exception \$ex) {
-                         echo "Error al guardar " . \$ex->getMessage();
-                     }
-                 } else {
-                     if (\$this->{$table}->update(\$datos["id$tableUpCase"], \$datos) == false) {
-                         \$errores = \$this->{$table}->errors();
-                         foreach (\$errores as \$field => \$error) {
-                             echo \$error . " ";
-                         }
-                         return;
-                     } else {
-                         \$dateLog["description"] = lang("$table.logUpdated") . json_encode(\$datos);
-                         \$dateLog["user"] = \$userName;
-                         \$this->log->save(\$dateLog);
-                         echo "Actualizado Correctamente";
-                         return;
-                     }
-                 }
-                 return;
-             }
-             /**
-              * Delete $tableUpCase
-              * @param type \$id
-              * @return type
-              */
-             public function delete(\$id) {
-                 \$info$tableUpCase = \$this->{$table}->find(\$id);
-                 helper('auth');
-                 \$userName = user()->username;
-                 if (!\$found = \$this->{$table}->delete(\$id)) {
-                     return \$this->failNotFound(lang('$table.msg.msg_get_fail'));
-                 }
-                 \$this->{$table}->purgeDeleted();
-                 \$logData["description"] = lang("{$table}.logDeleted") . json_encode(\$info$tableUpCase);
-                 \$logData["user"] = \$userName;
-                 \$this->log->save(\$logData);
-                 return \$this->respondDeleted(\$found, lang('$table.msg_delete'));
-             }
-         }
-                
-        EOF;
+                \$this->log->save([
+                    "description" => lang("$table.logDescription") . json_encode(\$datos),
+                    "user" => \$userName
+                ]);
+                return \$this->respond(['status' => 201, 'message' => 'Guardado correctamente'], 201);
+            } catch (\Throwable \$ex) {
+                return \$this->respond(['status' => 500, 'message' => 'Error al guardar: ' . \$ex->getMessage()], 500);
+            }
+        } else {
+            if (!\$this->{$varName}->update(\$idKey, \$datos)) {
+                \$errores = implode(" ", \$this->{$varName}->errors());
+                return \$this->respond(['status' => 400, 'message' => \$errores], 400);
+            }
+            \$this->log->save([
+                "description" => lang("$table.logUpdated") . json_encode(\$datos),
+                "user" => \$userName
+            ]);
+            return \$this->respond(['status' => 200, 'message' => 'Actualizado correctamente'], 200);
+        }
+    }
 
-        file_put_contents(ROOTPATH . "app/Controllers/{$tableUpCase}Controller.php", $controller);
+    public function delete(\$id)
+    {
+        helper('auth');
+
+        \$userName = user()->username;
+        \$registro = \$this->{$varName}->find(\$id);
+
+        if (!\$this->{$varName}->delete(\$id)) {
+            return \$this->respond(['status' => 404, 'message' => lang("$table.msg.msg_get_fail")], 404);
+        }
+
+        \$this->{$varName}->purgeDeleted();
+        \$this->log->save([
+            "description" => lang("$table.logDeleted") . json_encode(\$registro),
+            "user" => \$userName
+        ]);
+
+        return \$this->respondDeleted(\$registro, lang("$table.msg_delete"));
+    }
+}
+PHP;
+
+        $filePath = ROOTPATH . "app/Controllers/{$tableUpCase}Controller.php";
+
+        if (!is_dir(dirname($filePath))) {
+            mkdir(dirname($filePath), 0777, true);
+        }
+
+        file_put_contents($filePath, $controller);
     }
 
     /**
      * Generate View
      */
     public function generateView($table) {
-
         $tableUpCase = ucfirst($table);
         $query = $this->db->getFieldNames($table);
 
@@ -326,353 +349,199 @@ class AutoCrudController extends BaseController {
             $fields .= $field . ",";
 
             if ($contador > 0) {
-
                 $columnaDatatable .= "<th><?= lang('$table.fields.$field') ?></th>" . PHP_EOL;
-
-                $datosDatatable .= <<<EOF
-                         
-                        {
-                            'data': '$field'
-                        },
-                        EOF . PHP_EOL;
-                if ($field <> "created_at" && $field <> "updated_at" && $field <> "deleted_at") {
+                $datosDatatable .= "{ 'data': '$field' }," . PHP_EOL;
+                if ($field !== "created_at" && $field !== "updated_at" && $field !== "deleted_at") {
                     $variablesGuardar1 .= "var $field = $(\"#$field\").val();" . PHP_EOL;
                     $variablesFormData .= "datos.append(\"$field\", $field);" . PHP_EOL;
 
                     if ($field == "idEmpresa") {
-
                         $inputsEdit .= "$(\"#$field\").val(respuesta[\"$field\"]).trigger(\"change\");" . PHP_EOL;
                     } else {
-
                         $inputsEdit .= "$(\"#$field\").val(respuesta[\"$field\"]);" . PHP_EOL;
                     }
                 }
             } else {
-                $variablesGuardar1 .= <<<EOF
-                    
-                    var id$tableUpCase = $("#id$tableUpCase").val();
-                    EOF . PHP_EOL;
-
-                $variablesFormData .= <<<EOF
-                        var datos = new FormData();
-                        datos.append("id$tableUpCase", id$tableUpCase);
-                        EOF . PHP_EOL;
+                $variablesGuardar1 .= "var id$tableUpCase = $(\"#id$tableUpCase\").val();" . PHP_EOL;
+                $variablesFormData .= "var datos = new FormData();\n";
+                $variablesFormData .= "datos.append(\"id$tableUpCase\", id$tableUpCase);" . PHP_EOL;
             }
             $contador++;
         }
-        $fields = substr($fields, 0, strlen($fields) - 1);
+        $fields = rtrim($fields, ',');
         $nameClassModel = ucfirst($table) . "Model";
+
+        // Reemplazar el chequeo de respuesta por JSON
+        $ajaxSuccessCheck = <<<JS
+if (respuesta?.message?.includes("Guardado") || respuesta?.message?.includes("Actualizado")) {
+    Toast.fire({
+        icon: 'success',
+        title: respuesta.message
+    });
+    table$tableUpCase.ajax.reload();
+    $("#btnSave$tableUpCase").removeAttr("disabled");
+    $('#modalAdd$tableUpCase').modal('hide');
+} else {
+    Toast.fire({
+        icon: 'error',
+        title: respuesta.message || "Error desconocido"
+    });
+    $("#btnSave$tableUpCase").removeAttr("disabled");
+}
+JS;
+
         $view = <<<EOF
-        <?= \$this->include('julio101290\boilerplate\Views\load\select2') ?>
-        <?= \$this->include('julio101290\boilerplate\Views\load\datatables') ?>
-        <?= \$this->include('julio101290\boilerplate\Views\load\\nestable') ?>
-        <!-- Extend from layout index -->
-        <?= \$this->extend('julio101290\boilerplate\Views\layout\index') ?>
-
-        <!-- Section content -->
-        <?= \$this->section('content') ?>
-
-        <?= \$this->include('modules$tableUpCase/modalCapture$tableUpCase') ?>
-
-        <!-- SELECT2 EXAMPLE -->
-        <div class="card card-default">
-         <div class="card-header">
-             <div class="float-right">
-                 <div class="btn-group">
-
-                     <button class="btn btn-primary btnAdd$tableUpCase" data-toggle="modal" data-target="#modalAdd$tableUpCase"><i class="fa fa-plus"></i>
-
-                         <?= lang('$table.add') ?>
-
-                     </button>
-
-                 </div>
+<?= \$this->include('julio101290\boilerplate\Views\load\select2') ?>
+<?= \$this->include('julio101290\boilerplate\Views\load\datatables') ?>
+<?= \$this->include('julio101290\boilerplate\Views\load\\nestable') ?>
+<?= \$this->extend('julio101290\boilerplate\Views\layout\index') ?>
+<?= \$this->section('content') ?>
+<?= \$this->include('modules$tableUpCase/modalCapture$tableUpCase') ?>
+<div class="card card-default">
+ <div class="card-header">
+     <div class="float-right">
+         <div class="btn-group">
+             <button class="btn btn-primary btnAdd$tableUpCase" data-toggle="modal" data-target="#modalAdd$tableUpCase">
+                 <i class="fa fa-plus"></i> <?= lang('$table.add') ?>
+             </button>
+         </div>
+     </div>
+ </div>
+ <div class="card-body">
+     <div class="row">
+         <div class="col-md-12">
+             <div class="table-responsive">
+                 <table id="table$tableUpCase" class="table table-striped table-hover va-middle table$tableUpCase">
+                     <thead>
+                         <tr>
+                             <th>#</th>
+                             $columnaDatatable
+                             <th><?= lang('$table.fields.actions') ?></th>
+                         </tr>
+                     </thead>
+                     <tbody></tbody>
+                 </table>
              </div>
          </div>
-         <div class="card-body">
-             <div class="row">
-                 <div class="col-md-12">
-                     <div class="table-responsive">
-                         <table id="table$tableUpCase" class="table table-striped table-hover va-middle table$tableUpCase">
-                             <thead>
-                                 <tr>
-
-                                     <th>#</th>
-                                     $columnaDatatable
-                                     <th><?= lang('$table.fields.actions') ?> </th>
-
-                                 </tr>
-                             </thead>
-                             <tbody>
-                             </tbody>
-                         </table>
-                     </div>
-                 </div>
-             </div>
-         </div>
-        </div>
-        <!-- /.card -->
-
-        <?= \$this->endSection() ?>
-
-
-        <?= \$this->section('js') ?>
-        <script>
-
-         /**
-          * Cargamos la tabla
-          */
-
-         var table{$tableUpCase} = $('#table{$tableUpCase}').DataTable({
-             processing: true,
-             serverSide: true,
-             responsive: true,
-             autoWidth: false,
-             order: [[1, 'asc']],
-
-             ajax: {
-                 url: '<?= base_url('admin/$table') ?>',
-                 method: 'GET',
-                 dataType: "json"
-             },
-             columnDefs: [{
-                     orderable: false,
-                     targets: [$contador],
-                     searchable: false,
-                     targets: [$contador]
-
-                 }],
-             columns: [{
-                     'data': 'id'
-                 },
-                
-                 $datosDatatable
-                 {
-                     "data": function (data) {
-                         return `<td class="text-right py-0 align-middle">
-                                 <div class="btn-group btn-group-sm">
-                                     <button class="btn btn-warning btnEdit$tableUpCase" data-toggle="modal" id$tableUpCase="\${data.id}" data-target="#modalAdd$tableUpCase">  <i class=" fa fa-edit"></i></button>
-                                     <button class="btn btn-danger btn-delete" data-id="\${data.id}"><i class="fas fa-trash"></i></button>
-                                 </div>
-                                 </td>`
-                     }
-                 }
-             ]
-         });
-
-
-
-         $(document).on('click', '#btnSave$tableUpCase', function (e) {
-
-             $variablesGuardar1
-             $("#btnSave$tableUpCase").attr("disabled", true);
-
-             $variablesFormData
-
-             $.ajax({
-
-                 url: "<?= base_url('admin/$table/save') ?>",
-                 method: "POST",
-                 data: datos,
-                 cache: false,
-                 contentType: false,
-                 processData: false,
-                 success: function (respuesta) {
-                     if (respuesta.match(/Correctamente.*/)) {
-                
-                         Toast.fire({
-                             icon: 'success',
-                             title: "Guardado Correctamente"
-                         });
-
-                         table$tableUpCase.ajax.reload();
-                         $("#btnSave$tableUpCase").removeAttr("disabled");
-
-
-                         $('#modalAdd$tableUpCase').modal('hide');
-                     } else {
-
-                         Toast.fire({
-                             icon: 'error',
-                             title: respuesta
-                         });
-
-                         $("#btnSave$tableUpCase").removeAttr("disabled");
-                        
-
-                     }
-
-                 }
-
-             }
-
-             ).fail(function (jqXHR, textStatus, errorThrown) {
-
-                if (jqXHR.status === 0) {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "No hay conexión.!" + jqXHR.responseText
-                    });
-
-                    $("#btnSave$tableUpCase").removeAttr("disabled");
-
-
-                } else if (jqXHR.status == 404) {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "Requested page not found [404]" + jqXHR.responseText
-                    });
-
-                    $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                } else if (jqXHR.status == 500) {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "Internal Server Error [500]." + jqXHR.responseText
-                    });
-
-
-                    $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                } else if (textStatus === 'parsererror') {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "Requested JSON parse failed." + jqXHR.responseText
-                    });
-
-                   $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                } else if (textStatus === 'timeout') {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "Time out error." + jqXHR.responseText
-                    });
-
-                   $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                } else if (textStatus === 'abort') {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: "Ajax request aborted." + jqXHR.responseText
-                    });
-
-                    $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                } else {
-
-                    Swal.fire({
-                        icon: "error",
-                        title: "Oops...",
-                        text: 'Uncaught Error: ' + jqXHR.responseText
-                    });
-
-
-                    $("#btnSave$tableUpCase").removeAttr("disabled");
-
-                }
-            })
-
-         });
-
-
-
-         /**
-          * Carga datos actualizar
-          */
-
-
-         /*=============================================
-          EDITAR $tableUpCase
-          =============================================*/
-         $(".table$tableUpCase").on("click", ".btnEdit$tableUpCase", function () {
-
-             var id$tableUpCase = $(this).attr("id$tableUpCase");
-                
-             var datos = new FormData();
-             datos.append("id$tableUpCase", id$tableUpCase);
-
-             $.ajax({
-
-                 url: "<?= base_url('admin/$table/get$tableUpCase')?>",
-                 method: "POST",
-                 data: datos,
-                 cache: false,
-                 contentType: false,
-                 processData: false,
-                 dataType: "json",
-                 success: function (respuesta) {
-                     $("#id$tableUpCase").val(respuesta["id"]);
-                     
-                     $inputsEdit
-
-                 }
-
-             })
-
-         })
-
-
-         /*=============================================
-          ELIMINAR $table
-          =============================================*/
-         $(".table$tableUpCase").on("click", ".btn-delete", function () {
-
-             var id$tableUpCase = $(this).attr("data-id");
-
-             Swal.fire({
-                 title: '<?= lang('boilerplate.global.sweet.title') ?>',
-                 text: "<?= lang('boilerplate.global.sweet.text') ?>",
-                 icon: 'warning',
-                 showCancelButton: true,
-                 confirmButtonColor: '#3085d6',
-                 cancelButtonColor: '#d33',
-                 confirmButtonText: '<?= lang('boilerplate.global.sweet.confirm_delete') ?>'
-             })
-                     .then((result) => {
-                         if (result.value) {
-                             $.ajax({
-                                 url: `<?= base_url('admin/$table') ?>/` + id$tableUpCase,
-                                 method: 'DELETE',
-                             }).done((data, textStatus, jqXHR) => {
-                                 Toast.fire({
-                                     icon: 'success',
-                                     title: jqXHR.statusText,
-                                 });
-
-
-                                 table$tableUpCase.ajax.reload();
-                             }).fail((error) => {
-                                 Toast.fire({
-                                     icon: 'error',
-                                     title: error.responseJSON.messages.error,
-                                 });
-                             })
-                         }
-                     })
-         })
-
-         $(function () {
-            $("#modalAdd$tableUpCase").draggable();
-            
+     </div>
+ </div>
+</div>
+<?= \$this->endSection() ?>
+<?= \$this->section('js') ?>
+<script>
+var table{$tableUpCase} = $('#table{$tableUpCase}').DataTable({
+    processing: true,
+    serverSide: true,
+    responsive: true,
+    autoWidth: false,
+    order: [[1, 'asc']],
+    ajax: {
+        url: '<?= base_url('admin/$table') ?>',
+        method: 'GET',
+        dataType: "json"
+    },
+    columnDefs: [{
+        orderable: false,
+        targets: [$contador],
+        searchable: false,
+        targets: [$contador]
+    }],
+    columns: [{ 'data': 'id' },
+        $datosDatatable
+        {
+            "data": function (data) {
+                return `<td class="text-right py-0 align-middle">
+                         <div class="btn-group btn-group-sm">
+                             <button class="btn btn-warning btnEdit$tableUpCase" data-toggle="modal" id$tableUpCase="\${data.id}" data-target="#modalAdd$tableUpCase">  <i class=" fa fa-edit"></i></button>
+                             <button class="btn btn-danger btn-delete" data-id="\${data.id}"><i class="fas fa-trash"></i></button>
+                         </div>
+                         </td>`
+            }
+        }
+    ]
+});
+
+$(document).on('click', '#btnSave$tableUpCase', function (e) {
+    $variablesGuardar1
+    $("#btnSave$tableUpCase").attr("disabled", true);
+    $variablesFormData
+    $.ajax({
+        url: "<?= base_url('admin/$table/save') ?>",
+        method: "POST",
+        data: datos,
+        cache: false,
+        contentType: false,
+        processData: false,
+        dataType: "json",
+        success: function (respuesta) {
+            $ajaxSuccessCheck
+        }
+    }).fail(function (jqXHR, textStatus, errorThrown) {
+        Swal.fire({
+            icon: "error",
+            title: "Oops...",
+            text: jqXHR.responseText
         });
+        $("#btnSave$tableUpCase").removeAttr("disabled");
+    });
+});
 
+$(".table$tableUpCase").on("click", ".btnEdit$tableUpCase", function () {
+    var id$tableUpCase = $(this).attr("id$tableUpCase");
+    var datos = new FormData();
+    datos.append("id$tableUpCase", id$tableUpCase);
+    $.ajax({
+        url: "<?= base_url('admin/$table/get$tableUpCase')?>",
+        method: "POST",
+        data: datos,
+        cache: false,
+        contentType: false,
+        processData: false,
+        dataType: "json",
+        success: function (respuesta) {
+            $("#id$tableUpCase").val(respuesta["id"]);
+            $inputsEdit
+        }
+    });
+});
 
-        </script>
-        <?= \$this->endSection() ?>
-                
-        EOF;
+$(".table$tableUpCase").on("click", ".btn-delete", function () {
+    var id$tableUpCase = $(this).attr("data-id");
+    Swal.fire({
+        title: '<?= lang('boilerplate.global.sweet.title') ?>',
+        text: "<?= lang('boilerplate.global.sweet.text') ?>",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: '<?= lang('boilerplate.global.sweet.confirm_delete') ?>'
+    }).then((result) => {
+        if (result.value) {
+            $.ajax({
+                url: `<?= base_url('admin/$table') ?>/` + id$tableUpCase,
+                method: 'DELETE',
+            }).done((data, textStatus, jqXHR) => {
+                Toast.fire({
+                    icon: 'success',
+                    title: jqXHR.statusText,
+                });
+                table$tableUpCase.ajax.reload();
+            }).fail((error) => {
+                Toast.fire({
+                    icon: 'error',
+                    title: error.responseJSON.messages.error,
+                });
+            });
+        }
+    });
+});
+
+$(function () {
+    $("#modalAdd$tableUpCase").draggable();
+});
+</script>
+<?= \$this->endSection() ?>
+EOF;
 
         file_put_contents(ROOTPATH . "app/Views/{$table}.php", $view);
     }
