@@ -11,8 +11,7 @@ class UserModel extends BaseModel {
         'status', 'status_message', 'active', 'force_pass_reset', 'permissions', 'deleted_at',
         'firstname', 'lastname'
     ];
-    
-    
+
     const ORDERABLE = [
         1 => 'username',
         2 => 'firstname',
@@ -35,11 +34,20 @@ class UserModel extends BaseModel {
         $condition = empty($search) ? $builder : $builder->groupStart()
                         ->like('username', $search)
                         ->orLike('email', $search)
-                         ->orLike('firstname', $search)
-                         ->orLike('lastname', $search)
+                        ->orLike('firstname', $search)
+                        ->orLike('lastname', $search)
                         ->groupEnd();
 
         return $condition->where('deleted_at', null);
     }
 
+    public function mdlGetUser($idUser) {
+
+        $result = $this->db->table('users')
+                        ->select('id,email,username,firstname,lastname')
+                        ->where('id', $idUser)
+                        ->get()->getResultArray();
+
+        return $result;
+    }
 }
