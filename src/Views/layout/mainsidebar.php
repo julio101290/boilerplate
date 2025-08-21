@@ -7,8 +7,9 @@
         <?php if (config('Boilerplate')->theme['sidebar']['user']['visible']) { ?>
             <div class="user-panel py-3 d-flex">
                 <div class="image">
-                    <img src="https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png" class="img-circle elevation-<?= config('Boilerplate')->theme['sidebar']['user']['shadow'] ?>"
-                         alt="User Image">
+                    <img src="<?= base_url(user()->profile_image ?? 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png') ?>" 
+                         class="img-circle elevation-<?= config('Boilerplate')->theme['sidebar']['user']['shadow'] ?>"
+                         alt="<?= user()->username ?>">
                 </div>
                 <div class="info">
                     <a href="<?= base_url(route_to('user-profile')) ?>" class="d-block"><?= user()->username ?></a>

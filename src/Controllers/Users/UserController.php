@@ -56,37 +56,93 @@ class UserController extends BaseController {
      * @return mixed
      */
     public function profile() {
-        if ($this->request->getMethod() === 'post') {
-            $id = user()->id;
+        $userId = user()->id;
+
+        if ($this->request->getMethod() === 'POST') {
+            // Validaciones
             $validationRules = [
-                'email' => "required|valid_email|is_unique[users.email,id,$id]",
-                'username' => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$id]",
+                'email' => "required|valid_email|is_unique[users.email,id,$userId]",
+                'username' => "required|alpha_numeric_space|min_length[3]|is_unique[users.username,id,$userId]",
                 'password' => 'if_exist',
                 'pass_confirm' => 'matches[password]',
+                // La imagen es opcional
+                'profile_image' => 'if_exist|is_image[profile_image]|max_size[profile_image,2048]',
             ];
 
             if (!$this->validate($validationRules)) {
                 return redirect()->back()->withInput()->with('error', $this->validator->getErrors());
             }
 
-            $user = new User();
+            $user = new \Myth\Auth\Entities\User();
 
+            // Password
             if ($this->request->getPost('password')) {
                 $user->password = $this->request->getPost('password');
             }
 
+            // Email y username
             $user->email = $this->request->getPost('email');
             $user->username = $this->request->getPost('username');
 
-            if ($this->users->skipValidation(true)->update(user()->id, $user)) {
+            // Carpeta de perfiles
+            $uploadPath = WRITEPATH . 'uploads/profiles/';
+            if (!is_dir($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Imagen de perfil
+            $image = $this->request->getFile('profile_image');
+            if ($image && $image->isValid() && !$image->hasMoved()) {
+                $uploadPath = WRITEPATH . 'uploads/profiles';
+                $imageName = $image->getRandomName(); // nombre único
+                $image->move($uploadPath, $imageName);
+                $user->profile_image = 'uploads/profiles/' . $imageName; // ruta relativa
+            } else {
+                // Mantener la imagen actual si no se sube nada
+                $currentUser = $this->users->asArray()->find($userId);
+                $user->profile_image = $currentUser['profile_image'] ?? null;
+            }
+
+
+            // Actualizar usuario
+            if ($this->users->skipValidation(true)->update($userId, $user)) {
                 return redirect()->back()->with('sweet-success', lang('boilerplate.user.msg.msg_update'));
             }
 
             return redirect()->back()->withInput()->with('sweet-error', lang('boilerplate.user.msg.msg_get_fail'));
         }
 
+        // Mostrar perfil
+        $currentUser = $this->users->find($userId);
+        $publicPath = FCPATH . 'uploads/profiles/';
+
+        $imageName = $currentUser->profile_image;
+
+        // Crear carpeta si no existe
+        if (!is_dir($publicPath)) {
+            mkdir($publicPath, 0755, true); // 0755 permisos y true para crear directorios recursivos
+        }
+
+
+        // Si hay imagen de perfil y aún no existe en la carpeta pública, copiarla
+        if (!empty($currentUser->profile_image)) {
+            $imageName = basename($currentUser->profile_image); // solo nombre del archivo
+            $sourcePath = WRITEPATH . $currentUser->profile_image; // ruta original en WRITEPATH
+            $destPath = $publicPath . $imageName;
+
+            if (file_exists($sourcePath) && !file_exists($destPath)) {
+                copy($sourcePath, $destPath);
+            }
+
+            // Actualizar la ruta que se pasará a la vista (relativa a FCPATH)
+            $currentUser->profile_image = 'uploads/profiles/' . $imageName;
+        }
+
+
+
         return view('julio101290\boilerplate\Views\User\profile', [
             'title' => lang('boilerplate.user.fields.profile'),
+            'user' => $currentUser,
         ]);
     }
 
