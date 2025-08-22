@@ -7,7 +7,17 @@
         <?php if (config('Boilerplate')->theme['sidebar']['user']['visible']) { ?>
             <div class="user-panel py-3 d-flex">
                 <div class="image">
-                    <img src="<?= base_url(user()->profile_image ?? 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png') ?>" 
+                    <?php
+                    $profileImage = user()->profile_image;
+
+                    // Verificar si existe el archivo en el servidor
+                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                        $profileImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                    } else {
+                        $profileImage = base_url($profileImage);
+                    }
+                    ?>
+                    <img src="<?= $profileImage ?>" 
                          class="img-circle elevation-<?= config('Boilerplate')->theme['sidebar']['user']['shadow'] ?>"
                          alt="<?= user()->username ?>">
                 </div>
