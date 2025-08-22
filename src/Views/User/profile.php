@@ -9,9 +9,19 @@
             <!-- Profile Image -->
             <div class="card card-primary card-outline">
                 <div class="card-body box-profile">
+                    <?php
+                    $profileImage = user()->profile_image;
+
+                    // Verificar si existe el archivo en el servidor
+                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                        $profiWleImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                    } else {
+                        $profileImage = base_url($profileImage);
+                    }
+                    ?>
                     <div class="text-center position-relative" style="width:150px; margin:auto;">
                         <img id="profileImage" class="profile-user-img img-fluid img-circle"
-                             src="<?=  base_url(user()->profile_image) ?? 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png' ?>"
+                             src="<?= $profileImage ?>"
                              alt="User profile picture"
                              style="cursor:pointer;">
 

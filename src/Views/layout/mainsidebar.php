@@ -12,7 +12,17 @@
                          alt="<?= user()->username ?>">
                 </div>
                 <div class="info">
-                    <a href="<?= base_url(route_to('user-profile')) ?>" class="d-block"><?= user()->username ?></a>
+                     <?php
+                    $profileImage = user()->profile_image;
+
+                    // Verificar si existe el archivo en el servidor
+                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                        $profiWleImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                    } else {
+                        $profileImage = base_url($profileImage);
+                    }
+                    ?>
+                    <a href="<?= $profileImage ?>" class="d-block"><?= user()->username ?></a>
                 </div>
             </div>
             <div class="form-inline">

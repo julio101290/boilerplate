@@ -138,8 +138,12 @@ class UserController extends BaseController {
             $currentUser->profile_image = 'uploads/profiles/' . $imageName;
         }
 
+        if ($currentUser->profile_image == 'uploads/profiles/') {
 
-
+            unset($currentUser->profile_image);
+        }
+       
+    
         return view('julio101290\boilerplate\Views\User\profile', [
             'title' => lang('boilerplate.user.fields.profile'),
             'user' => $currentUser,

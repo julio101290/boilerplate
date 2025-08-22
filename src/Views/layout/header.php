@@ -11,8 +11,18 @@
         <!-- Notifications Dropdown Menu -->
         <?php if (config('Boilerplate')->theme['navbar']['user']['visible']) { ?>
             <li class="nav-item">
+                <?php
+                    $profileImage = user()->profile_image;
+
+                    // Verificar si existe el archivo en el servidor
+                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                        $profiWleImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                    } else {
+                        $profileImage = base_url($profileImage);
+                    }
+                    ?>
                 <a href="<?= base_url(route_to('user-profile')) ?>" class="nav-link d-flex align-items-center">
-                    <img src="<?= base_url(user()->profile_image ?? 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png') ?>"
+                    <img src="<?= $profileImage ?>"
                          class="avatar-img img-circle bg-gray mr-2 elevation-<?= config('Boilerplate')->theme['navbar']['user']['shadow'] ?>"
                          alt="<?= user()->username ?>" height="32">
                          <?= user()->username ?>
@@ -29,7 +39,7 @@
                     <div class="card-body box-profile">
                         <div class="text-center">
                             <img class="profile-user-img img-fluid img-circle"
-                                 src="https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png" alt="User profile picture">
+                                 src="<?= base_url(route_to('user-profile')) ?>" alt="User profile picture">
                         </div>
 
                         <h3 class="profile-username text-center"><?= user()->username ?></h3>
