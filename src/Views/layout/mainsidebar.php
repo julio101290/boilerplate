@@ -16,8 +16,8 @@
                     $profileImage = user()->profile_image;
 
                     // Verificar si existe el archivo en el servidor
-                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
-                        $profiWleImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                    if (!$profileImage || !file_exists(FCPATH . $profileImage )) {
+                        $profileImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
                     } else {
                         $profileImage = base_url($profileImage);
                     }
