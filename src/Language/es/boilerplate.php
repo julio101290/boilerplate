@@ -115,4 +115,10 @@ return [
             'msg_get_fail' => 'El usuario no encontrado o ya eliminado.',
         ],
     ],
+     /**
+     * Auth
+     */
+    'Auth' => [
+        'showPassword' => 'Ver Contraseña',
+        ]
 ];
