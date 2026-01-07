@@ -90,7 +90,7 @@
 
             <?= $this->include('julio101290\boilerplate\Views\Authentication\message_block') ?>
 
-            <form action="<?= route_to('login') ?>" method="post">
+            <form action="<?= base_url(route_to('login')) ?>" method="post">
                 <?= csrf_field() ?>
 
                 <!-- LOGIN -->
