@@ -334,10 +334,11 @@ class UserController extends BaseController {
         } catch (\Exception $e) {
             $this->db->transRollback();
 
-            return redirect()->back()->with('sweet-error', $e->getMessage());
+            return redirect()->to(base_url('admin/user/manage'))->with('sweet-error', $e->getMessage());
         }
+      
 
-        return redirect()->back()->with('sweet-success', lang('boilerplate.user.msg.msg_update'));
+        return redirect()->to(base_url('admin/user/manage'))->with('sweet-success', lang('boilerplate.user.msg.msg_update'));
     }
 
     /**
