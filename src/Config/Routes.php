@@ -86,6 +86,11 @@ $routes->group('admin', function ($routes) {
             , ['namespace' => 'julio101290\boilerplate\Controllers']
     );
 
+    $routes->get('generateCRUDComposer/(:any)'
+            , 'AutoCrudControllerComposer::index/$1'
+            , ['namespace' => 'julio101290\boilerplate\Controllers']
+    );
+
     $routes->get('user/manage/(:any)/clone'
             , 'UserController::clone/$1'
             , ['namespace' => 'julio101290\boilerplate\Controllers\Users']
