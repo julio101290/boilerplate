@@ -151,30 +151,23 @@ class AutoCrudControllerComposer extends BaseController
         $permissionName = "{$table}-permission";
         $permissionDescription = "Permiso para la tabla {$table}";
         
-        // Crear el nombre de la variable para el permiso
         $permissionVar = "'{$permissionName}'";
         
-        // Verificar si el archivo existe
         if (file_exists($seederFile)) {
-            // Leer el contenido actual
             $content = file_get_contents($seederFile);
             
-            // Verificar si el permiso ya existe para no duplicar
             if (strpos($content, $permissionVar) !== false) {
                 echo "ℹ️ El permiso '{$permissionName}' ya existe en el seeder.<br>";
                 return;
             }
             
-            // Buscar la sección de permisos y agregar el nuevo
             $pattern = '/(\$this->authorize->createPermission\([^;]+;\s*)+/';
             if (preg_match($pattern, $content, $matches)) {
-                // Ya hay permisos, agregar después del último
                 $newPermissionLine = "        \$this->authorize->createPermission('{$permissionName}', '{$permissionDescription}');\n";
                 $newContent = str_replace($matches[0], $matches[0] . $newPermissionLine, $content);
                 file_put_contents($seederFile, $newContent);
                 echo "✅ Permiso '{$permissionName}' agregado al seeder.<br>";
             } else {
-                // No hay permisos, agregar después de la apertura del método run()
                 $insertPoint = "public function run() {";
                 $newCode = <<<PHP
 public function run() {
@@ -186,18 +179,15 @@ PHP;
                 echo "✅ Permiso '{$permissionName}' agregado al seeder.<br>";
             }
             
-            // También asegurar que se asigna al usuario 1
             $assignPattern = '/(\$this->authorize->addPermissionToUser\([^;]+;\s*)+/';
             $assignLine = "        \$this->authorize->addPermissionToUser('{$permissionName}', 1);\n";
             
             if (preg_match($assignPattern, $content, $assignMatches)) {
-                // Ya hay asignaciones, agregar después del último
-                $newContent = file_get_contents($seederFile); // Recargar por si cambió
+                $newContent = file_get_contents($seederFile);
                 $newContent = str_replace($assignMatches[0], $assignMatches[0] . $assignLine, $newContent);
                 file_put_contents($seederFile, $newContent);
                 echo "✅ Asignación del permiso '{$permissionName}' al usuario 1 agregada.<br>";
             } else {
-                // Buscar el final del método run() para agregar asignaciones
                 $newContent = file_get_contents($seederFile);
                 $endPattern = '/\s*}\s*public function down/';
                 if (preg_match($endPattern, $newContent, $endMatches)) {
@@ -206,9 +196,7 @@ PHP;
                     echo "✅ Asignación del permiso '{$permissionName}' al usuario 1 agregada.<br>";
                 }
             }
-            
         } else {
-            // Crear el archivo seeder desde cero
             $this->createSeederFile($table, $permissionName, $permissionDescription);
         }
     }
@@ -286,32 +274,26 @@ PHP;
         $routesPath = $this->vendorPath . 'Config/Routes.php';
         
         if (file_exists($routesPath)) {
-            // Leer el contenido existente
             $existingContent = file_get_contents($routesPath);
             
-            // Verificar si ya existe la ruta para esta tabla para no duplicar
             if (strpos($existingContent, "resource('{$table}'") !== false) {
                 echo "ℹ️ Las rutas para '{$table}' ya existen en el archivo de rutas del paquete.<br>";
                 return;
             }
             
-            // Buscar el cierre del grupo 'admin' para insertar antes
             $pattern = '/\$routes->group\(\'admin\', function \(\$routes\) \{([^}]*)\}\);/s';
             if (preg_match($pattern, $existingContent, $matches)) {
-                // Ya existe el grupo admin, agregar dentro
                 $groupContent = $matches[1];
                 $newGroupContent = $groupContent . "\n\n    // Rutas para {$table}\n" . $this->getRoutesGroupContent($table, $tableUpCase, $namespace, '    ');
                 $newContent = str_replace($groupContent, $newGroupContent, $existingContent);
                 file_put_contents($routesPath, $newContent);
                 echo "✅ Rutas para '{$table}' agregadas al archivo de rutas existente.<br>";
             } else {
-                // No existe el grupo admin, agregarlo al final
                 $newContent = $existingContent . "\n\n" . $this->getVendorRoutesCode($table, $tableUpCase, $namespace);
                 file_put_contents($routesPath, $newContent);
                 echo "✅ Grupo admin con rutas para '{$table}' agregado al archivo de rutas.<br>";
             }
         } else {
-            // Crear archivo nuevo
             $content = "<?php\n\n";
             $content .= "// Rutas para el paquete {$this->vendorPackage}\n";
             $content .= $this->getVendorRoutesCode($table, $tableUpCase, $namespace);
@@ -489,7 +471,12 @@ HTML;
             return;
         }
 
-        $allowedFields = array_map(fn($f) => "'$f'", $fieldsArray);
+        // Excluir campos que no deben estar en allowedFields (id y timestamps)
+        $excludedFields = ['id', 'created_at', 'updated_at', 'deleted_at'];
+        $allowedFields = array_filter($fieldsArray, function($field) use ($excludedFields) {
+            return !in_array($field, $excludedFields);
+        });
+        $allowedFields = array_map(fn($f) => "'$f'", $allowedFields);
         $allowedFieldsStr = implode(', ', $allowedFields);
 
         $prefixedFields = array_map(fn($f) => "a.$f", $fieldsArray);
@@ -519,9 +506,23 @@ class {$nombreClase} extends Model
     protected \$updatedField     = 'updated_at';
     protected \$deletedField     = 'deleted_at';
 
-    protected \$validationRules    = [];
+    protected \$validationRules    = [
+        'idEmpresa' => 'required|integer|greater_than[0]'
+    ];
     protected \$validationMessages = [];
     protected \$skipValidation     = false;
+
+    // Eventos para asegurar que deleted_at siempre sea null
+    protected \$beforeInsert = ['setDeletedAtNull'];
+    protected \$beforeUpdate = ['setDeletedAtNull'];
+
+    protected function setDeletedAtNull(array \$data)
+    {
+        if (isset(\$data['data']['deleted_at'])) {
+            unset(\$data['data']['deleted_at']);
+        }
+        return \$data;
+    }
 
     /**
      * Obtiene los registros filtrando por empresas del usuario
@@ -568,7 +569,6 @@ PHP;
         $namespace = $this->getNamespace('Controller');
         $modelNamespace = $this->getNamespace('Model');
 
-        // Determinar los use statements según el destino
         if ($this->targetType === 'vendor') {
             $useStatements = <<<USE
 use App\Controllers\BaseController;
@@ -586,7 +586,6 @@ use julio101290\boilerplatecompanies\Models\EmpresasModel;
 USE;
         }
 
-        // Definir la ruta de la vista para vendor (con namespace)
         $viewPath = $this->targetType === 'vendor' 
             ? "'{$this->vendorNamespace}\\Views\\{$table}'" 
             : "'{$table}'";
@@ -699,32 +698,56 @@ class {$tableUpCase}Controller extends BaseController
 
         \$userName = user()->username;
         \$datos = \$this->request->getPost();
+        
+        // Eliminar campos de timestamp para evitar conflictos
+        unset(\$datos['created_at'], \$datos['updated_at'], \$datos['deleted_at']);
+        
         \$idKey = \$datos["id{$tableUpCase}"] ?? 0;
 
         if (\$idKey == 0) {
             try {
                 if (!\$this->{$varName}->save(\$datos)) {
                     \$errores = implode(" ", \$this->{$varName}->errors());
-                    return \$this->respond(['status' => 400, 'message' => \$errores], 400);
+                    return \$this->respond([
+                        'status'    => 400,
+                        'message'   => \$errores,
+                        'csrf_hash' => csrf_hash()
+                    ], 400);
                 }
                 \$this->log->save([
                     "description" => lang("{$table}.logDescription") . json_encode(\$datos),
                     "user"        => \$userName
                 ]);
-                return \$this->respond(['status' => 201, 'message' => 'Guardado correctamente'], 201);
+                return \$this->respond([
+                    'status'    => 201,
+                    'message'   => 'Guardado correctamente',
+                    'csrf_hash' => csrf_hash()
+                ], 201);
             } catch (\Throwable \$ex) {
-                return \$this->respond(['status' => 500, 'message' => 'Error al guardar: ' . \$ex->getMessage()], 500);
+                return \$this->respond([
+                    'status'    => 500,
+                    'message'   => 'Error al guardar: ' . \$ex->getMessage(),
+                    'csrf_hash' => csrf_hash()
+                ], 500);
             }
         } else {
             if (!\$this->{$varName}->update(\$idKey, \$datos)) {
                 \$errores = implode(" ", \$this->{$varName}->errors());
-                return \$this->respond(['status' => 400, 'message' => \$errores], 400);
+                return \$this->respond([
+                    'status'    => 400,
+                    'message'   => \$errores,
+                    'csrf_hash' => csrf_hash()
+                ], 400);
             }
             \$this->log->save([
                 "description" => lang("{$table}.logUpdated") . json_encode(\$datos),
                 "user"        => \$userName
             ]);
-            return \$this->respond(['status' => 200, 'message' => 'Actualizado correctamente'], 200);
+            return \$this->respond([
+                'status'    => 200,
+                'message'   => 'Actualizado correctamente',
+                'csrf_hash' => csrf_hash()
+            ], 200);
         }
     }
 
@@ -739,7 +762,11 @@ class {$tableUpCase}Controller extends BaseController
         \$registro = \$this->{$varName}->find(\$id);
 
         if (!\$this->{$varName}->delete(\$id)) {
-            return \$this->respond(['status' => 404, 'message' => lang("{$table}.msg.msg_get_fail")], 404);
+            return \$this->respond([
+                'status'    => 404,
+                'message'   => lang("{$table}.msg.msg_get_fail"),
+                'csrf_hash' => csrf_hash()
+            ], 404);
         }
 
         \$this->{$varName}->purgeDeleted();
@@ -748,7 +775,11 @@ class {$tableUpCase}Controller extends BaseController
             "user"        => \$userName
         ]);
 
-        return \$this->respondDeleted(\$registro, lang("{$table}.msg_delete"));
+        return \$this->respondDeleted([
+            'data'      => \$registro,
+            'message'   => lang("{$table}.msg_delete"),
+            'csrf_hash' => csrf_hash()
+        ]);
     }
 }
 PHP;
@@ -802,10 +833,8 @@ PHP;
             $contador++;
         }
 
-        // Token CSRF y configuración AJAX
         $csrfMeta = '<meta name="csrf-token" content="<?= csrf_hash() ?>">' . "\n";
         $csrfScript = <<<JS
-    // Configuración global de AJAX para incluir el token CSRF en las cabeceras
     \$.ajaxSetup({
         headers: {
             'X-CSRF-TOKEN': \$('meta[name="csrf-token"]').attr('content')
@@ -842,13 +871,8 @@ JS;
                                            $variablesGuardar1, $variablesFormData, $inputsEdit,
                                            $contador, $csrfMeta, $csrfScript)
     {
-        // Determinar la ruta de inclusión del modal
         if ($this->targetType === 'vendor') {
-            // Para vendor: usar namespace con barras invertidas
             $modalInclude = "{$this->vendorNamespace}\\Views\\modules{$tableUpCase}\\modalCapture{$tableUpCase}";
-            // Reemplazar \ por / para que funcione en la sintaxis de include?
-            // En CodeIgniter, el helper view() acepta tanto / como \ pero es más seguro usar \\ en el código PHP.
-            // Para la salida en la vista, usamos \\ (doble barra invertida) porque se imprimirá como texto.
             $modalInclude = str_replace('\\', '\\\\', $modalInclude);
         } else {
             $modalInclude = "modules{$tableUpCase}/modalCapture{$tableUpCase}";
@@ -869,6 +893,11 @@ JS;
                     title: respuesta.message || "Error desconocido"
                 });
                 $("#btnSave{$tableUpCase}").removeAttr("disabled");
+            }
+            // Actualizar el token CSRF si la respuesta lo incluye (tanto éxito como error)
+            if (respuesta.csrf_hash) {
+                $('input[name="'+csrfName+'"]').val(respuesta.csrf_hash);
+                $('meta[name="csrf-token"]').attr('content', respuesta.csrf_hash);
             }
 JS;
 
@@ -917,6 +946,7 @@ JS;
 <script>
 {$csrfScript}
 
+var csrfName = '<?= csrf_token() ?>';
 var table{$tableUpCase} = $('#table{$tableUpCase}').DataTable({
     processing: true,
     serverSide: true,
@@ -959,6 +989,10 @@ $(document).on('click', '#btnSave{$tableUpCase}', function (e) {
     {$variablesGuardar1}
     $("#btnSave{$tableUpCase}").attr("disabled", true);
     {$variablesFormData}
+    
+    var csrfHash = $('input[name="'+csrfName+'"]').val();
+    datos.append(csrfName, csrfHash);
+
     $.ajax({
         url: "<?= base_url('admin/{$table}/save') ?>",
         method: "POST",
@@ -971,11 +1005,26 @@ $(document).on('click', '#btnSave{$tableUpCase}', function (e) {
             {$ajaxSuccessCheck}
         },
         error: function (jqXHR, textStatus, errorThrown) {
-            Swal.fire({
-                icon: "error",
-                title: "Oops...",
-                text: jqXHR.responseText
-            });
+            // Intentar obtener la respuesta JSON aunque haya error HTTP
+            try {
+                var respuesta = jqXHR.responseJSON;
+                if (respuesta && respuesta.csrf_hash) {
+                    $('input[name="'+csrfName+'"]').val(respuesta.csrf_hash);
+                    $('meta[name="csrf-token"]').attr('content', respuesta.csrf_hash);
+                }
+                var mensaje = (respuesta && respuesta.message) ? respuesta.message : jqXHR.responseText;
+                Swal.fire({
+                    icon: "error",
+                    title: "Oops...",
+                    text: mensaje
+                });
+            } catch (e) {
+                Swal.fire({
+                    icon: "error",
+                    title: "Oops...",
+                    text: jqXHR.responseText
+                });
+            }
             $("#btnSave{$tableUpCase}").removeAttr("disabled");
         }
     });
@@ -1024,7 +1073,7 @@ $(".table{$tableUpCase}").on("click", ".btn-delete", function () {
             }).fail((error) => {
                 Toast.fire({
                     icon: 'error',
-                    title: error.responseJSON.messages.error,
+                    title: error.responseJSON?.message || error.responseText,
                 });
             });
         }
@@ -1066,9 +1115,6 @@ HTML;
         if (!is_dir($viewModalPath)) {
             mkdir($viewModalPath, 0777, true);
         }
-
-        // Para vendor, la inclusión se hará con namespace en la vista principal, 
-        // el contenido del modal no necesita cambios adicionales.
 
         $modalContent = <<<HTML
 <!-- Modal {$tableUpCase} -->
