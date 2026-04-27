@@ -58,7 +58,7 @@ class UserController extends BaseController {
     public function profile() {
         $userId = user()->id;
 
-        if ($this->request->getMethod() === 'POST') {
+        if (strtoupper($this->request->getMethod()) === 'POST') {
             // Validaciones
             $validationRules = [
                 'email' => "required|valid_email|is_unique[users.email,id,$userId]",
