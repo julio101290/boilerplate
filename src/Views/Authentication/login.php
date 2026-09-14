@@ -3,10 +3,16 @@
 
 <style>
     body.login-page {
-        background:
+        background: 
+        <?php if (file_exists(FCPATH . 'img/back.png')): ?>
+            /* Si la imagen existe en public/img/fondo.jpg, la aplica encima del degradado */
+            url('<?= base_url('img/back.png') ?>') no-repeat center center fixed,
+        <?php endif; ?>
+            /* Degradados por defecto si no existe la imagen o como respaldo */
             radial-gradient(circle at top left, #1e3c72, transparent 60%),
             radial-gradient(circle at bottom right, #2a5298, transparent 60%),
             linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        background-size: cover;
         min-height: 100vh;
     }
 
