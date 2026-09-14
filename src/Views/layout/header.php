@@ -12,15 +12,15 @@
         <?php if (config('Boilerplate')->theme['navbar']['user']['visible']) { ?>
             <li class="nav-item">
                 <?php
-                    $profileImage = user()->profile_image;
+                $profileImage = user()->profile_image;
 
-                    // Verificar si existe el archivo en el servidor
-                    if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
-                        $profileImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
-                    } else {
-                        $profileImage = base_url($profileImage);
-                    }
-                    ?>
+                // Verificar si existe el archivo en el servidor
+                if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                    $profileImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                } else {
+                    $profileImage = base_url($profileImage);
+                }
+                ?>
                 <a href="<?= base_url(route_to('user-profile')) ?>" class="nav-link d-flex align-items-center">
                     <img src="<?= $profileImage ?>"
                          class="avatar-img img-circle bg-gray mr-2 elevation-<?= config('Boilerplate')->theme['navbar']['user']['shadow'] ?>"
@@ -38,8 +38,20 @@
                 <div class="card card-primary card-outline">
                     <div class="card-body box-profile">
                         <div class="text-center">
+
+                            <?php
+                            $profileImage = user()->profile_image;
+
+                            // Verificar si existe el archivo en el servidor
+                            if (!$profileImage || !file_exists(FCPATH . $profileImage)) {
+                                $profileImage = 'https://cdn.jsdelivr.net/npm/admin-lte@3.0.2/dist/img/avatar.png';
+                            } else {
+                                $profileImage = base_url($profileImage);
+                            }
+                            ?>
+
                             <img class="profile-user-img img-fluid img-circle"
-                                 src="<?= base_url(route_to('user-profile')) ?>" alt="User profile picture">
+                                 src="<?= $profileImage ?>" alt="User profile picture">
                         </div>
 
                         <h3 class="profile-username text-center"><?= user()->username ?></h3>
