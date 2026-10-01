@@ -1,5 +1,8 @@
 <?php
 
+
+$routes->set404Override('julio101290\boilerplate\Controllers\ErrorController::index');
+
 $routes->group('admin', function ($routes) {
 
     /**
@@ -95,4 +98,8 @@ $routes->group('admin', function ($routes) {
             , 'UserController::clone/$1'
             , ['namespace' => 'julio101290\boilerplate\Controllers\Users']
     );
+    
+    
+    $routes->get('error404', 'julio101290\boilerplate\Controllers\ErrorController::index');
+    
 });
