@@ -29,6 +29,10 @@ class DashboardController extends BaseController
         $defaultTabId    = 0; // 0 = Main Dashboard Overview tab
 
         foreach ($allItems as $item) {
+            // Normalize stored URLs (including legacy full URLs) and build host-independent URLs
+            $item['relative_url'] = $this->normalizeRelativeUrl($item['url']);
+            $item['resolved_url'] = $this->buildDynamicUrl($item['relative_url']);
+
             if (in_array($item['display_type'], ['shortcut', 'both'], true)) {
                 $commonFunctions[] = $item;
             }
@@ -47,6 +51,7 @@ class DashboardController extends BaseController
             'commonFunctions' => $commonFunctions,
             'customTabs'      => $customTabs,
             'defaultTabId'    => $defaultTabId,
+            'basePath'        => $this->getBasePath(),
         ];
 
         return view('julio101290\boilerplate\Views\dashboard', $data);
@@ -59,12 +64,19 @@ class DashboardController extends BaseController
     {
         $userId      = (int) user()->id;
         $title       = trim((string) $this->request->getPost('title'));
-        $url         = trim((string) $this->request->getPost('url'));
+        $rawUrl      = trim((string) $this->request->getPost('url'));
         $icon        = trim((string) $this->request->getPost('icon')) ?: 'fas fa-link';
         $displayType = (string) $this->request->getPost('display_type');
         $isDefault   = (int) $this->request->getPost('is_default_tab') === 1 ? 1 : 0;
 
-        if ($title === '' || !$this->isValidMenuUrl($url)) {
+        if ($title === '' || !$this->isValidMenuUrl($rawUrl)) {
+            return $this->jsonResponse(false, lang('Dashboard.msgInvalidItem'), [], 422);
+        }
+
+        // Store only the relative route (e.g. "admin/reportMttoSAP")
+        $relativeUrl = $this->normalizeRelativeUrl($rawUrl);
+
+        if ($relativeUrl === '') {
             return $this->jsonResponse(false, lang('Dashboard.msgInvalidItem'), [], 422);
         }
 
@@ -80,7 +92,7 @@ class DashboardController extends BaseController
         // Check if this URL is already saved for this user; if so, update it
         $existing = $this->shortcutModel
             ->where('user_id', $userId)
-            ->where('url', $url)
+            ->where('url', $relativeUrl)
             ->first();
 
         if ($isDefault === 1) {
@@ -90,7 +102,7 @@ class DashboardController extends BaseController
         $payload = [
             'user_id'        => $userId,
             'title'          => $title,
-            'url'            => $url,
+            'url'            => $relativeUrl,
             'icon'           => preg_replace('/[^a-zA-Z0-9\-\s]/', '', $icon),
             'display_type'   => $displayType,
             'is_default_tab' => $isDefault,
@@ -125,7 +137,7 @@ class DashboardController extends BaseController
             return $this->jsonResponse(false, lang('Dashboard.msgError'), [], 404);
         }
 
-        // Optional scope: if user removes only from shortcut or only from tab when display_type === 'both'
+        // If saved as 'both', allow removing only the shortcut or only the tab
         $scope = (string) $this->request->getPost('scope');
 
         if ($item['display_type'] === 'both' && in_array($scope, ['shortcut', 'tab'], true)) {
@@ -171,6 +183,53 @@ class DashboardController extends BaseController
     }
 
     /**
+     * Strip scheme, host, port, and optional base subfolder.
+     * Example: "https://192.168.0.178:8443/admin/reportMttoSAP" -> "admin/reportMttoSAP"
+     */
+    private function normalizeRelativeUrl(string $url): string
+    {
+        $url = trim($url);
+
+        if (preg_match('#^https?://#i', $url)) {
+            $parsed = parse_url($url);
+            $path   = $parsed['path'] ?? '';
+            $query  = isset($parsed['query']) ? '?' . $parsed['query'] : '';
+            $url    = $path . $query;
+        }
+
+        $cleanUrl = ltrim($url, '/');
+        $basePath = trim($this->getBasePath(), '/');
+
+        if ($basePath !== '' && str_starts_with($cleanUrl, $basePath . '/')) {
+            $cleanUrl = substr($cleanUrl, strlen($basePath) + 1);
+        }
+
+        return ltrim($cleanUrl, '/');
+    }
+
+    /**
+     * Build a root-relative URL so the browser automatically uses the active IP or domain.
+     * Example: "admin/reportMttoSAP" -> "/admin/reportMttoSAP"
+     */
+    private function buildDynamicUrl(string $relativePath): string
+    {
+        $basePath  = trim($this->getBasePath(), '/');
+        $cleanPath = ltrim($relativePath, '/');
+
+        return ($basePath !== '' ? '/' . $basePath : '') . '/' . $cleanPath;
+    }
+
+    /**
+     * Return the base path (e.g. "/" or "/myapp/").
+     */
+    private function getBasePath(): string
+    {
+        $path = trim((string) parse_url(base_url(), PHP_URL_PATH), '/');
+
+        return $path === '' ? '/' : '/' . $path . '/';
+    }
+
+    /**
      * Validate that the URL is not empty, '#', or a javascript: payload.
      */
     private function isValidMenuUrl(string $url): bool
@@ -199,10 +258,10 @@ class DashboardController extends BaseController
         return $this->response
             ->setStatusCode($statusCode)
             ->setJSON(array_merge([
-                'success'   => $success,
-                'message'   => $message,
-                'csrfName'  => csrf_token(),
-                'csrfHash'  => csrf_hash(),
+                'success'  => $success,
+                'message'  => $message,
+                'csrfName' => csrf_token(),
+                'csrfHash' => csrf_hash(),
             ], $extra));
     }
 }

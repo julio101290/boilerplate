@@ -2,9 +2,9 @@
 
 <?= $this->section('content') ?>
 <?php
-$locale      = service('request')->getLocale();
-$intlLocale  = str_starts_with($locale, 'es') ? 'es_ES' : 'en_US';
-$formatter   = new IntlDateFormatter($intlLocale, IntlDateFormatter::FULL, IntlDateFormatter::NONE);
+$locale            = service('request')->getLocale();
+$intlLocale        = str_starts_with($locale, 'es') ? 'es_ES' : 'en_US';
+$formatter         = new IntlDateFormatter($intlLocale, IntlDateFormatter::FULL, IntlDateFormatter::NONE);
 $isOverviewDefault = ($defaultTabId === 0);
 ?>
 
@@ -42,7 +42,7 @@ $isOverviewDefault = ($defaultTabId === 0);
                            id="tab-link-<?= (int) $tab['id'] ?>"
                            data-toggle="pill"
                            href="#tab-pane-<?= (int) $tab['id'] ?>"
-                           data-url="<?= esc($tab['url'], 'attr') ?>"
+                           data-url="<?= esc($tab['resolved_url'], 'attr') ?>"
                            data-tab-id="<?= (int) $tab['id'] ?>"
                            role="tab"
                            aria-controls="tab-pane-<?= (int) $tab['id'] ?>"
@@ -138,13 +138,13 @@ $isOverviewDefault = ($defaultTabId === 0);
                                         <div class="col-xl-3 col-lg-4 col-md-6 mb-3 shortcut-card-col" id="shortcut-card-<?= (int) $shortcut['id'] ?>">
                                             <div class="card shortcut-card h-100 shadow-sm border">
                                                 <div class="card-body d-flex align-items-center justify-content-between p-3">
-                                                    <a href="<?= esc($shortcut['url'], 'attr') ?>" class="d-flex align-items-center text-dark text-decoration-none flex-grow-1 overflow-hidden">
+                                                    <a href="<?= esc($shortcut['resolved_url'], 'attr') ?>" class="d-flex align-items-center text-dark text-decoration-none flex-grow-1 overflow-hidden">
                                                         <div class="shortcut-icon bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mr-3 flex-shrink-0">
                                                             <i class="<?= esc($shortcut['icon'], 'attr') ?>"></i>
                                                         </div>
                                                         <div class="text-truncate">
                                                             <h6 class="mb-0 font-weight-bold text-truncate"><?= esc($shortcut['title']) ?></h6>
-                                                            <small class="text-muted text-truncate d-block"><?= esc($shortcut['url']) ?></small>
+                                                            <small class="text-muted text-truncate d-block"><?= esc($shortcut['relative_url']) ?></small>
                                                         </div>
                                                     </a>
                                                     <button type="button"
@@ -251,7 +251,7 @@ $isOverviewDefault = ($defaultTabId === 0);
                                     data-target="#iframe-tab-<?= (int) $tab['id'] ?>">
                                 <i class="fas fa-sync-alt mr-1"></i><?= esc(lang('Dashboard.reloadTab')) ?>
                             </button>
-                            <a href="<?= esc($tab['url'], 'attr') ?>" class="btn btn-sm btn-outline-primary">
+                            <a href="<?= esc($tab['resolved_url'], 'attr') ?>" class="btn btn-sm btn-outline-primary">
                                 <i class="fas fa-external-link-alt mr-1"></i><?= esc(lang('Dashboard.openFullPage')) ?>
                             </a>
                         </div>
@@ -259,8 +259,8 @@ $isOverviewDefault = ($defaultTabId === 0);
                     <div class="card-body p-0">
                         <iframe id="iframe-tab-<?= (int) $tab['id'] ?>"
                                 class="dashboard-tab-iframe"
-                                data-src="<?= esc($tab['url'], 'attr') ?>"
-                                src="<?= $isActive ? esc($tab['url'], 'attr') : 'about:blank' ?>"
+                                data-src="<?= esc($tab['resolved_url'], 'attr') ?>"
+                                src="<?= $isActive ? esc($tab['resolved_url'], 'attr') : 'about:blank' ?>"
                                 frameborder="0"></iframe>
                     </div>
                 </div>
@@ -390,6 +390,7 @@ $isOverviewDefault = ($defaultTabId === 0);
     .main-sidebar .nav-sidebar a.nav-link[draggable="true"] {
         cursor: grab;
     }
+
     .main-sidebar .nav-sidebar a.nav-link[draggable="true"]:active {
         cursor: grabbing;
     }
@@ -398,8 +399,9 @@ $isOverviewDefault = ($defaultTabId === 0);
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const config = {
+        basePath:      '<?= esc($basePath, 'js') ?>',
         saveUrl:       '<?= route_to('dashboard.shortcuts.save') ?>',
-        deleteBaseUrl: '<?= base_url('admin/dashboard/shortcuts/delete') ?>/',
+        deleteBaseUrl: '<?= rtrim($basePath, '/') ?>/admin/dashboard/shortcuts/delete/',
         setDefaultUrl: '<?= route_to('dashboard.shortcuts.setDefault') ?>',
         csrfName:      '<?= csrf_token() ?>',
         csrfHash:      '<?= csrf_hash() ?>',
@@ -423,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     setInterval(updateTime, 1000);
 
-    // 2. Make valid AdminLTE sidebar menu items draggable (excluding '#')
+    // 2. URL Helpers
     function isValidHref(rawHref) {
         if (!rawHref) return false;
         const trimmed = rawHref.trim();
@@ -433,6 +435,23 @@ document.addEventListener('DOMContentLoaded', function () {
         return true;
     }
 
+    // Extract only the relative path (e.g. "admin/reportMttoSAP") without domain, IP, or port
+    function extractRelativePath(href) {
+        try {
+            const parsed = new URL(href, window.location.origin);
+            let path = parsed.pathname + parsed.search;
+
+            if (config.basePath !== '/' && path.startsWith(config.basePath)) {
+                path = path.slice(config.basePath.length);
+            }
+
+            return path.replace(/^\/+/, '');
+        } catch (err) {
+            return String(href || '').replace(/^\/+/, '');
+        }
+    }
+
+    // 3. Make valid AdminLTE sidebar menu items draggable (excluding '#')
     function initSidebarDraggables() {
         const sidebarLinks = document.querySelectorAll('.main-sidebar .nav-sidebar a.nav-link');
 
@@ -452,7 +471,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     ? labelEl.childNodes[0].textContent.trim()
                     : link.textContent.trim();
 
-                // Clean AdminLTE utility classes from icon
                 let iconClass = 'fas fa-link';
                 if (iconEl) {
                     iconClass = Array.from(iconEl.classList)
@@ -462,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const payload = {
                     title: title,
-                    url:   link.href, // Full resolved URL
+                    url:   extractRelativePath(link.href),
                     icon:  iconClass
                 };
 
@@ -478,7 +496,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // 3. Configure Drop Zones (both Common Functions card & Top Tab Bar)
+    // 4. Configure Drop Zones (both Common Functions card & Top Tab Bar)
     const dropZones = [
         document.getElementById('common-functions-dropzone'),
         document.getElementById('dashboard-tab-dropzone')
@@ -517,13 +535,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Pre-select "tab" if dropped directly onto the tab bar, otherwise "shortcut"
             const droppedOnTabBar = zone.id === 'dashboard-tab-dropzone';
             openPinModal(item, droppedOnTabBar ? 'tab' : 'shortcut');
         });
     });
 
-    // 4. Pin Modal Logic
+    // 5. Pin Modal Logic
     const displayTypeRadios = document.querySelectorAll('input[name="display_type"]');
     const defaultTabWrapper = document.getElementById('default-tab-checkbox-wrapper');
     const defaultTabInput   = document.getElementById('pin-item-default');
@@ -552,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function () {
         $('#pinMenuItemModal').modal('show');
     }
 
-    // 5. Save Shortcut / Tab via AJAX
+    // 6. Save Shortcut / Tab via AJAX
     document.getElementById('pinMenuItemForm').addEventListener('submit', function (e) {
         e.preventDefault();
 
@@ -577,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(() => alert(config.i18n.error));
     });
 
-    // 6. Delete Shortcut / Tab
+    // 7. Delete Shortcut / Tab
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.btn-delete-shortcut');
         if (!btn) return;
@@ -610,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(() => alert(config.i18n.error));
     });
 
-    // 7. Set Default Tab
+    // 8. Set Default Tab
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.btn-set-default-tab');
         if (!btn) return;
@@ -636,7 +653,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Update star icons visually without reloading
             document.querySelectorAll('.btn-set-default-tab').forEach(starBtn => {
                 const isDefault = String(starBtn.dataset.id) === String(shortcutId);
                 starBtn.classList.toggle('text-warning', isDefault);
@@ -651,7 +667,7 @@ document.addEventListener('DOMContentLoaded', function () {
         .catch(() => alert(config.i18n.error));
     });
 
-    // 8. Lazy-load iframes on tab click & strip AdminLTE chrome inside embedded iframes
+    // 9. Lazy-load iframes on tab click & strip AdminLTE chrome inside embedded iframes
     function cleanEmbeddedAdminLTE(iframe) {
         try {
             const doc = iframe.contentDocument || iframe.contentWindow.document;
@@ -681,7 +697,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Load iframe only when user activates a custom tab
     $('a.dashboard-custom-tab-link').on('shown.bs.tab', function (e) {
         const tabId  = e.target.dataset.tabId;
         const iframe = document.getElementById('iframe-tab-' + tabId);
@@ -690,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Reload button inside custom tabs
     document.addEventListener('click', function (e) {
         const btn = e.target.closest('.btn-reload-iframe');
         if (!btn) return;
@@ -703,4 +717,4 @@ document.addEventListener('DOMContentLoaded', function () {
     initSidebarDraggables();
 });
 </script>
-//<?= $this->endSection() ?>
+<?= $this->endSection() ?>
