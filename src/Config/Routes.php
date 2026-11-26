@@ -102,4 +102,9 @@ $routes->group('admin', function ($routes) {
     
     $routes->get('error404', 'julio101290\boilerplate\Controllers\ErrorController::index');
     
+    $routes->get('dashboard', 'DashboardController::index', ['as' => 'dashboard','namespace' => 'julio101290\boilerplate\Controllers']);
+    $routes->post('dashboard/shortcuts/save', 'DashboardController::saveShortcut', ['as' => 'dashboard.shortcuts.save','namespace' => 'julio101290\boilerplate\Controllers']);
+    $routes->post('dashboard/shortcuts/delete/(:num)', 'DashboardController::deleteShortcut/$1', ['as' => 'dashboard.shortcuts.delete','namespace' => 'julio101290\boilerplate\Controllers']);
+    $routes->post('dashboard/shortcuts/set-default', 'DashboardController::setDefaultTab', ['as' => 'dashboard.shortcuts.setDefault','namespace' => 'julio101290\boilerplate\Controllers']);
+    
 });
